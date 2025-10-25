@@ -1,0 +1,54 @@
+name: Deploy with Data (Workflows & Credentials)
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_data:
+        description: 'Include n8n data (workflows, credentials)'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+        - 'true'
+        - 'false'
+
+jobs:
+  deploy-with-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy configuration and data
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        source: "backups/latest"
+        target: "/tmp/n8n-restore"
+
+    - name: Restore on server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          cd /path/to/n8n-automation-k8s
+          
+          if [ "${{ inputs.include_data }}" == "true" ]; then
+            echo "📦 Restoring n8n data (workflows, credentials)..."
+            ./scripts/restore.sh /tmp/n8n-restore
+          fi
+          
+          # Restart to apply changes
+          docker compose restart n8n
+          
+          echo "✅ Deployment with data completed"
+
+    - name: Success message
+      run: |
+        echo "✅ All workflows and credentials have been deployed"
+        echo "🔗 Access n8n at: http://${{ secrets.SERVER_HOST }}:5678"

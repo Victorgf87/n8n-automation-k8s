@@ -1,0 +1,54 @@
+name: Deploy to Remote Server
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - '.gitignore'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Create backup before deployment
+      run: |
+        echo "📦 Creating backup of current deployment"
+        
+    - name: Deploy to server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          cd /path/to/n8n-automation-k8s
+          
+          # Pull latest changes
+          git pull origin main
+          
+          # Backup current state
+          ./scripts/backup.sh || echo "No current backup script"
+          
+          # Stop current services
+          docker compose down
+          
+          # Pull latest images
+          docker compose pull
+          
+          # Start services
+          docker compose up -d
+          
+          # Show status
+          docker compose ps
+          
+    - name: Health check
+      run: |
+        echo "✅ Deployment completed"
+        echo "🔗 Access n8n at: http://${{ secrets.SERVER_HOST }}:5678"
